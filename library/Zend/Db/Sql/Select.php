@@ -346,6 +346,9 @@ class Select extends AbstractSql implements SqlInterface, PreparableSqlInterface
         return $this;
     }
 
+    /**
+     * @todo Added having and group for DbSelect in Zend\Paginator
+     */
     public function getRawState($key = null)
     {
         $rawState = array(
@@ -354,6 +357,8 @@ class Select extends AbstractSql implements SqlInterface, PreparableSqlInterface
             'joins' => $this->joins,
             'where' => $this->where,
             'order' => $this->order,
+            'group' => $this->group,
+            'having' => $this->having,
             'limit' => $this->limit,
             'offset' => $this->offset
         );
