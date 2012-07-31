@@ -5,7 +5,7 @@
  * @link      http://github.com/zendframework/zf2 for the canonical source repository
  * @copyright Copyright (c) 2005-2012 Zend Technologies USA Inc. (http://www.zend.com)
  * @license   http://framework.zend.com/license/new-bsd New BSD License
- * @package   Zend_Cache
+ * @package   Zend_Paginator
  */
 
 namespace Zend\Paginator\Adapter;
@@ -26,10 +26,19 @@ use Zend\Db\ResultSet\ResultSet;
  */
 class DbSelectOptions extends AbstractOptions
 {
+    /**
+     * @var DbAdapter
+     */
     protected $db_adapter;
 
+    /**
+     * @var SqlSelect
+     */
     protected $select_query;
 
+    /**
+     * @var ResultSet
+     */
     protected $result_set_prototype;
 
     public function setDbAdapter(DbAdapter $adapter)
