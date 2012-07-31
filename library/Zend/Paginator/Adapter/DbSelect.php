@@ -11,9 +11,6 @@
 namespace Zend\Paginator\Adapter;
 
 use Zend\Db\Sql;
-use Zend\Db\Adapter;
-use Zend\Db\Adapter\Driver\ResultInterface;
-use Zend\Db\ResultSet\ResultSet;
 
 /**
  * @category   Zend
@@ -31,51 +28,35 @@ class DbSelect implements AdapterInterface
     /**
      * The COUNT query
      *
-     * @var \Zend\Db\Sql\Select
+     * @var Sql\Select
      */
-    protected $_countSelect = null;
+    protected $countSelect = null;
 
     /**
-     * Database query
+     * Adapter Options
      *
-     * @var \Zend\Db\Sql\Select
+     * @var DbSelectOptions
      */
-    protected $_select = null;
-
-    /**
-     * Database sql
-     *
-     * @var \Zend\Db\Sql\Sql
-     */
-
-    protected $_sql = null;
-
-    /**
-     * Database adapter
-     *
-     * @var \Zend\Db\Adapter\Adapter
-     */
-    protected $_adapter = null;
-
+    protected $options = null;
 
     /**
      * Total item count
      *
      * @var integer
      */
-    protected $_rowCount = null;
+    protected $rowCount = null;
 
     /**
      * Constructor.
      *
-     * @param \Zend\Db\Sql\Select $select The select query
-     * @param \Zend\Db\Adapter $adapter the current adapter
+     * @param array|DbSelectOptions $select The Select Query object
      */
-    public function __construct(Sql\Select $select, Adapter\Adapter $adapter)
+    public function __construct($options)
     {
-        $this->_select = $select;
-        $this->_adapter = $adapter;
-        $this->_sql = new Sql\Sql($adapter);
+        if ( ! $options instanceof DbSelectOptions ) {
+            $options = new DbSelectOptions($options);
+        }
+        $this->options = $options;
     }
 
     /**
@@ -88,7 +69,7 @@ class DbSelect implements AdapterInterface
      * Users are therefore encouraged to profile their queries to find
      * the solution that best meets their needs.
      *
-     * @param  \Zend\Db\Sql\Select|integer $rowCount Total row count integer
+     * @param  Sql\Select|integer $rowCount Total row count integer
      *                                               or query
      * @throws Exception\InvalidArgumentException
      * @return DbSelect
@@ -96,24 +77,28 @@ class DbSelect implements AdapterInterface
     public function setRowCount($rowCount)
     {
         if ($rowCount instanceof Sql\Select) {
-            $selectString = $this->_sql->getSqlStringForSqlObject($rowCount);
-            $statement = $this->_adapter->query($selectString);
+            $columns = $rowCount->getRawState('columns');
+            $countColumn = $columns[0];
+            if ($countColumn instanceof Sql\ExpressionInterface) {
+                $countColumn = $countColumn->getExpressionData();
 
-            $rowCountColumn = self::ROW_COUNT_COLUMN;
-
-            // The select query can contain only one column, which should be the row count column
-            if (false === strpos($selectString, $rowCountColumn)) {
-                throw new Exception\InvalidArgumentException('Row count column not found');
+                // The select query can contain only one column, which should be the row count column
+                if(false === strpos($countColumn[0][0], self::ROW_COUNT_COLUMN)) {
+                    throw new Exception\InvalidArgumentException('Row count column not found');
+                }
             }
 
-            $result = $statement->execute()->current();
-
-            $this->_rowCount = count($result) > 0 ? $result[$rowCountColumn] : 0;
-        } else if (is_integer($rowCount)) {
-            $this->_rowCount = $rowCount;
+            $dbAdapter      = $this->options->getDbAdapter();
+            $dbPlatform     = $dbAdapter->getPlatform();
+            $sqlString      = $rowCount->getSqlString($dbPlatform);
+            $result         = $dbAdapter->query($sqlString)->execute();
+            $this->rowCount = count($result);
+        } elseif (is_integer($rowCount)) {
+            $this->rowCount = $rowCount;
         } else {
             throw new Exception\InvalidArgumentException('Invalid row count');
         }
+
         return $this;
     }
 
@@ -122,27 +107,18 @@ class DbSelect implements AdapterInterface
      *
      * @param  integer $offset           Page offset
      * @param  integer $itemCountPerPage Number of items per page
-     * @throws Exception\InvalidArgumentException
-     * @return Resultset $resultSet
+     * @return array
      */
     public function getItems($offset, $itemCountPerPage)
     {
-        $this->_select->offset($offset);
-        $this->_select->limit($itemCountPerPage);
+        $select = $this->options->getSelectQuery();
+        $select->limit($itemCountPerPage)->offset($offset);
 
-        $selectString = $this->_sql->getSqlStringForSqlObject($this->_select);
-
-        $statement = $this->_adapter->query($selectString);
-        $result = $statement->execute();
-
-        if ($result instanceof ResultInterface && $result->isQueryResult()) {
-            $resultSet = new ResultSet;
-            $resultSet->initialize($result);
-
-            return $resultSet;
-        } else {
-            throw new Exception\InvalidArgumentException('Invalid result');
-        }
+        $sql        = new Sql\Sql($this->options->dbAdapter);
+        $statement  = $sql->prepareStatementForSqlObject($select);
+        $result     = $statement->execute();
+        $resultset  = $this->options->getResultSetPrototype()->initialize($result);
+        return $resultset->toArray();
     }
 
     /**
@@ -152,13 +128,13 @@ class DbSelect implements AdapterInterface
      */
     public function count()
     {
-        if ($this->_rowCount === null) {
+        if ($this->rowCount === null) {
             $this->setRowCount(
                 $this->getCountSelect()
             );
         }
 
-        return $this->_rowCount;
+        return $this->rowCount;
     }
 
     /**
@@ -168,7 +144,7 @@ class DbSelect implements AdapterInterface
      * In that use-case I'm expecting problems when either GROUP BY or DISTINCT
      * has one column.
      *
-     * @return \Zend\Db\Sql\Select
+     * @return Sql\Select
      */
     public function getCountSelect()
     {
@@ -176,58 +152,20 @@ class DbSelect implements AdapterInterface
          * We only need to generate a COUNT query once. It will not change for
          * this instance.
          */
-        if ($this->_countSelect !== null) {
-            return $this->_countSelect;
+        if ($this->countSelect !== null) {
+            return $this->countSelect;
         }
 
-        $rowCount = clone $this->_select;
-        $platform = $this->_adapter->platform;
+        $rowCount = clone $this->options->getSelectQuery();
+        $dbAdapter = $this->options->getDbAdapter();
 
-        $countColumn = $platform->quoteIdentifier(self::ROW_COUNT_COLUMN);
-        $countPart   = 'COUNT(1) AS ';
-        $groupPart   = null;
+        // Reset columns to contain only a COUNT(1) column
+        $rowCount->columns(array(
+                                new Sql\Expression('COUNT(1) AS ' . $dbAdapter->getPlatform()->quoteIdentifier(self::ROW_COUNT_COLUMN))
+                           ));
 
-        $columnPart = $rowCount->getRawState('columns');
-        $tablePart = $rowCount->getRawState('table');
-        $groupParts  = $rowCount->getRawState('group');
-        $havingParts = $rowCount->getRawState('having');
+        $this->countSelect = $rowCount;
 
-        /**
-         * If there is more than one column AND it's a DISTINCT query, more
-         * than one group, or if the query has a HAVING clause, then take
-         * the original query and use it as a subquery os the COUNT query.
-         */
-        if (count($groupParts) > 1 || ($havingParts->count() > 0)) {
-            $sqlString = $this->_select->getSqlString();
-
-            $tablePart = array('t' => $sqlString);
-
-        } else if (!empty($groupParts) && $groupParts[0] !== Sql\Select::SQL_STAR &&
-            !($groupParts[0] instanceof Sql\ExpressionInterface)
-        ) {
-            $groupPart = $platform->quoteIdentifierInFragment($groupParts[0]);
-        }
-
-        /**
-         * If the original query had a GROUP BY or a DISTINCT part and only
-         * one column was specified, create a COUNT(DISTINCT ) query instead
-         * of a regular COUNT query.
-         */
-        if (!empty($groupPart)) {
-            $countPart = 'COUNT(DISTINCT ' . $groupPart . ') AS ';
-        }
-
-        /**
-         * Create the COUNT part of the query
-         */
-        $expression = new Sql\Expression($countPart . $countColumn);
-
-        $select = new Sql\Select();
-        $select->from($tablePart)
-            ->columns(array($expression));
-
-        $this->_countSelect = $select;
-
-        return $select;
+        return $rowCount;
     }
 }
