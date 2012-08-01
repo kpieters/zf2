@@ -162,23 +162,31 @@ class DbSelect implements AdapterInterface
         $countColumn = $dbPlatform->quoteIdentifier(self::ROW_COUNT_COLUMN);
         $countPart   = 'COUNT(1) AS ';
         $groupPart   = null;
+        $isDistinct  = false;
 
-        $columnPart = $rowCount->getRawState('columns');
+        $columnParts = $rowCount->getRawState('columns');
         $tablePart = $rowCount->getRawState('table');
         $groupParts  = $rowCount->getRawState('group');
         $havingParts = $rowCount->getRawState('having');
+
+        if ($columnParts != null) {
+            $isDistinct = $this->isDistinct($columnParts);
+        }
 
         /**
          * If there is more than one column AND it's a DISTINCT query, more
          * than one group, or if the query has a HAVING clause, then take
          * the original query and use it as a subquery os the COUNT query.
          */
-        if (count($groupParts) > 1 || ($havingParts->count() > 0)) {
+        if ((false !== $isDistinct && count($columnParts) > 1) || count($groupParts) > 1 || ($havingParts->count() > 0)) {
             $sqlString = $rowCount->getSqlString($dbPlatform);
 
+            //@todo: don't use hardcoded t
             $tablePart = array('t' => $sqlString);
 
-        } else if (!empty($groupParts) && $groupParts[0] !== Sql\Select::SQL_STAR &&
+        } elseif (false !== $isDistinct) {
+            $groupPart = $dbPlatform->quoteIdentifierInFragment($isDistinct);
+        } elseif (!empty($groupParts) && $groupParts[0] !== Sql\Select::SQL_STAR &&
             !($groupParts[0] instanceof Sql\ExpressionInterface)
         ) {
             $groupPart = $dbPlatform->quoteIdentifierInFragment($groupParts[0]);
@@ -205,5 +213,40 @@ class DbSelect implements AdapterInterface
         $this->_countSelect = $select;
 
         return $select;
+    }
+
+    /**
+     * @todo: needs to be checked after distinct is fixed ZF2-424
+     * assumption: Only the first occurence of distinct is used,
+     *
+     * Check if there is a distinct column and return the first column name.
+     *
+     * @param $columnParts
+     * @return bool if false else returns string column
+     *
+     */
+    protected function isDistinct($columnParts) {
+
+        foreach($columnParts as $columnPart) {
+            if($columnPart instanceof Sql\ExpressionInterface) {
+                $exprData = $columnPart->getExpressionData();
+
+                $pos = strpos(strtolower($exprData[0][0]), 'distinct');
+                if(false !== $pos) {
+
+                    // check if the column part is set as an value
+                    if (!empty($exprData[0][1])) {
+                        $column = $exprData[0][1][0];
+                    } else {
+                        // remove all the text before distinct + space
+                        $column = substr($exprData[0][0], $pos + 9 );
+                    }
+                    return $column;
+                }
+            }
+        }
+
+        return false;
+
     }
 }
