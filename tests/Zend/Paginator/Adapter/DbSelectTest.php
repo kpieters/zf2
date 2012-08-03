@@ -294,7 +294,6 @@ class DbSelectTest extends \PHPUnit_Framework_TestCase
         $db = $this->db;
 
         $db->query('DROP TABLE IF EXISTS `sandboxTransaction`', DbAdapter\Adapter::QUERY_MODE_EXECUTE);
-//        $adapter->query('ALTER TABLE ADD INDEX(`foo_index`) ON (`foo_column`))', Adapter::QUERY_MODE_EXECUTE);
         $db->query('DROP TABLE IF EXISTS `sandboxForeign`', DbAdapter\Adapter::QUERY_MODE_EXECUTE);
 
         // A transaction table
