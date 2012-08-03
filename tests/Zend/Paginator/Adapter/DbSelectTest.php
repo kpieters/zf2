@@ -291,11 +291,11 @@ class DbSelectTest extends \PHPUnit_Framework_TestCase
      */
     public function testSelectHasAliasedColumns()
     {
-        $this->markTestSkipped('Not clear yet how to fix this');
         $db = $this->db;
 
-        $db->query('DROP TABLE IF EXISTS `sandboxTransaction`')->execute();
-        $db->query('DROP TABLE IF EXISTS `sandboxForeign`')->execute();
+        $db->query('DROP TABLE IF EXISTS `sandboxTransaction`', DbAdapter\Adapter::QUERY_MODE_EXECUTE);
+//        $adapter->query('ALTER TABLE ADD INDEX(`foo_index`) ON (`foo_column`))', Adapter::QUERY_MODE_EXECUTE);
+        $db->query('DROP TABLE IF EXISTS `sandboxForeign`', DbAdapter\Adapter::QUERY_MODE_EXECUTE);
 
         // A transaction table
         $db->query(
@@ -303,25 +303,27 @@ class DbSelectTest extends \PHPUnit_Framework_TestCase
                 `id` INTEGER PRIMARY KEY,
                 `foreign_id` INT( 1 ) NOT NULL ,
                 `name` TEXT NOT NULL
-            ) '
-        )->execute();
+            ) ',
+            DbAdapter\Adapter::QUERY_MODE_EXECUTE);
 
         // A foreign table
         $db->query(
             'CREATE TABLE `sandboxForeign` (
                 `id` INTEGER PRIMARY KEY,
                 `name` TEXT NOT NULL
-            ) '
-        )->execute();
+            ) ',
+            DbAdapter\Adapter::QUERY_MODE_EXECUTE);
 
         // Insert some data
-        $db->query("INSERT INTO `sandboxTransaction` (`foreign_id`,`name`) VALUES ('1','transaction 1 with foreign_id 1');")->execute();
-        $db->query("INSERT INTO `sandboxTransaction` (`foreign_id`,`name`) VALUES ('1','transaction 2 with foreign_id 1');")->execute();
-        $db->query("INSERT INTO `sandboxForeign` (`name`) VALUES ('John Doe');")->execute();
-        $db->query("INSERT INTO `sandboxForeign` (`name`) VALUES ('Jane Smith');")->execute();
+        $db->query("INSERT INTO `sandboxTransaction` (`foreign_id`,`name`) VALUES ('1','transaction 1 with foreign_id 1');", DbAdapter\Adapter::QUERY_MODE_EXECUTE);
+        $db->query("INSERT INTO `sandboxTransaction` (`foreign_id`,`name`) VALUES ('1','transaction 2 with foreign_id 1');", DbAdapter\Adapter::QUERY_MODE_EXECUTE);
+        $db->query("INSERT INTO `sandboxForeign` (`name`) VALUES ('John Doe');", DbAdapter\Adapter::QUERY_MODE_EXECUTE);
+        $db->query("INSERT INTO `sandboxForeign` (`name`) VALUES ('Jane Smith');", DbAdapter\Adapter::QUERY_MODE_EXECUTE);
 
+        //@todo check which column to use for distinct, not sure if it's the right one
+        $expr = new Sql\Expression("DISTINCT foreign_id");
         $query = new Sql\Select();
-        $query->distinct()
+        $query->columns(array($expr))
             ->from(array('a'=>'sandboxTransaction'), array())
             ->join(array('b'=>'sandboxForeign'), 'a.foreign_id = b.id', array('name'));
 
