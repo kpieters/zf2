@@ -340,4 +340,85 @@ class FieldsetTest extends TestCase
         $fieldset = $this->fieldset->remove('foo');
         $this->assertSame($this->fieldset, $fieldset);
     }
+
+    public function testCanRemoveElementsByWrongName()
+    {
+        $element = new Element('foo');
+        $this->fieldset->add($element);
+        $element2 = new Element('bar');
+        $this->fieldset->add($element2);
+        $this->assertTrue($this->fieldset->has('foo'));
+        $this->assertTrue($this->fieldset->has('bar'));
+
+        // remove wrong element, bar still available
+        $this->fieldset->remove('bars');
+        $this->assertTrue($this->fieldset->has('foo'));
+        $this->assertTrue($this->fieldset->has('bar'));
+
+        $this->fieldset->remove('bar');
+        $this->assertTrue($this->fieldset->has('foo'));
+        $this->assertFalse($this->fieldset->has('bar'));
+    }
+
+    public function testSetOptions()
+    {
+        $this->fieldset->setOptions(array(
+             'foo' => 'bar'
+        ));
+        $option = $this->fieldset->getOption('foo');
+
+        $this->assertEquals('bar', $option);
+    }
+
+    public function testSetOptionsUseAsBaseFieldset()
+    {
+        $this->fieldset->setOptions(array(
+             'use_as_base_fieldset' => 'bar'
+        ));
+        $option = $this->fieldset->getOption('use_as_base_fieldset');
+
+        $this->assertEquals('bar', $option);
+    }
+
+    public function testGetReturnsNull()
+    {
+        $foo = $this->fieldset->get('foo');
+        $this->assertNull($foo);
+    }
+
+    public function testBindValuesHasNoName()
+    {
+        $bindValues = $this->fieldset->bindValues(array('foo'));
+        $this->assertNull($bindValues);
+    }
+
+    public function testSetObjectWithStringRaisesException()
+    {
+        $this->setExpectedException('Zend\Form\Exception\InvalidArgumentException');
+        $this->fieldset->setObject('foo');
+    }
+
+    public function testSetMessagesWithInvalidElementRaisesException()
+    {
+        $this->setExpectedException('Zend\Form\Exception\InvalidArgumentException');
+        $this->fieldset->setMessages(null);
+    }
+
+    public function testGetMessagesWithInvalidElementRaisesException()
+    {
+        $this->setExpectedException('Zend\Form\Exception\InvalidArgumentException');
+        $this->fieldset->getMessages('foo');
+    }
+
+    public function testPopulateValuesWithInvalidElementRaisesException()
+    {
+        $this->setExpectedException('Zend\Form\Exception\InvalidArgumentException');
+        $this->fieldset->populateValues(null);
+    }
+
+    public function testAddWithInvalidElementRaisesException()
+    {
+        $this->setExpectedException('Zend\Form\Exception\InvalidArgumentException');
+        $this->fieldset->add(null);
+    }
 }

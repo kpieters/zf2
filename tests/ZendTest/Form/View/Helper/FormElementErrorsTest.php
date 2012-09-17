@@ -123,5 +123,16 @@ class FormElementErrorsTest extends CommonTestCase
         $this->assertEquals($helper(), $helper);
     }
 
+    public function testGetAttributes()
+    {
+        $messages = $this->getMessageList();
+        $element  = new Element('foo');
+        $element->setMessages($messages);
 
+        $this->helper->setAttributes(array('class' => 'error'));
+
+        $this->helper->render($element);
+
+        $this->assertEquals(array('class' => 'error'), $this->helper->getAttributes());
+    }
 }

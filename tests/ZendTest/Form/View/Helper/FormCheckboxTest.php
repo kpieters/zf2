@@ -91,4 +91,11 @@ class FormCheckboxTest extends CommonTestCase
         $this->setExpectedException('Zend\Form\Exception\InvalidArgumentException');
         $markup = $this->helper->render($element);
     }
+
+    public function testRaisesExceptionWhenNameIsNotPresentInElement()
+    {
+        $element = new Element\Checkbox();
+        $this->setExpectedException('Zend\Form\Exception\DomainException', 'name');
+        $this->helper->render($element);
+    }
 }

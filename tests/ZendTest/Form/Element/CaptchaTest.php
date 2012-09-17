@@ -100,4 +100,11 @@ class CaptchaTest extends TestCase
         $test = array_shift($inputSpec['validators']);
         $this->assertSame($captcha, $test);
     }
+
+    public function testCaptchaWithNullRaisesException()
+    {
+        $element = new CaptchaElement();
+        $this->setExpectedException('Zend\Form\Exception\InvalidArgumentException');
+        $element->setCaptcha(null);
+    }
 }

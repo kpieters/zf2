@@ -292,4 +292,11 @@ class FormButtonTest extends CommonTestCase
         $this->helper->setTranslatorEnabled(false);
         $this->assertFalse($this->helper->isTranslatorEnabled());
     }
+
+    public function testOpenTagWithWrongElementRaisesException()
+    {
+        $element = new \arrayObject();
+        $this->setExpectedException('Zend\Form\Exception\InvalidArgumentException', 'ArrayObject');
+        $this->helper->openTag($element);
+    }
 }

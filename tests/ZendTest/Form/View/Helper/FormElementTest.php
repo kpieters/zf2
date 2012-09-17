@@ -199,4 +199,13 @@ class FormElementTest extends TestCase
         $element = new Element('foo');
         $this->assertSame($this->helper, $this->helper->__invoke());
     }
+
+    public function testRendersCollectionAsExpected()
+    {
+        $element = new Element\Collection();
+        $element->setLabel('foo');
+
+        $markup  = $this->helper->render($element);
+        $this->assertContains('<legend>foo</legend>', $markup);
+    }
 }
